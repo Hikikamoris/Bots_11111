@@ -1,9 +1,10 @@
 import time
 import feedparser
 import asyncio
-import redis
+import json
 from telegram import Bot
 import re
+from datetime import datetime, timedelta
 
 TOKEN = "8099129290:AAGptZmiE0jSbqami7mcO58AZHxoTUX-UZU"
 CHANNEL_ID = "@vzglad_today"
@@ -13,22 +14,13 @@ RSS_FEED_URLS = [
     "https://www.rbc.ru/rbcfreenews/index.rss",
 ]
 
-REDIS_HOST = "localhost"  # Или используйте адрес хоста в облаке
-REDIS_PORT = 6379
-REDIS_DB = 0
-
 bot = Bot(token=TOKEN)
 
-# Подключение к Redis
-redis_client = redis.StrictRedis(host=REDIS_HOST, port=REDIS_PORT, db=REDIS_DB, decode_responses=True)
+# Словарь для хранения ссылок с временными метками
+published_links = {}
 
-def load_published_links():
-    # Получаем список ссылок из Redis (если они есть)
-    return set(redis_client.smembers("published_links"))
-
-def save_published_links(links):
-    # Сохраняем ссылки в Redis
-    redis_client.sadd("published_links", *links)
+# Время, после которого посты считаются старыми
+TIME_LIMIT = timedelta(hours=12)
 
 def clean_html(text):
     text = re.sub(r'<br>', '\n', text)
@@ -40,7 +32,7 @@ def remove_read_more(text):
     return text
 
 async def fetch_and_post():
-    published_links = load_published_links()  # Получаем текущие опубликованные ссылки
+    global published_links
     for rss_feed_url in RSS_FEED_URLS:
         feed = feedparser.parse(rss_feed_url)
         if feed.bozo:
@@ -48,24 +40,32 @@ async def fetch_and_post():
             continue
 
         for entry in feed.entries:
-            if entry.link not in published_links:
-                clean_title = clean_html(entry.title)
-                clean_summary = clean_html(entry.summary)
-                clean_summary = remove_read_more(clean_summary)
+            # Проверяем, была ли уже опубликована ссылка в последние 12 часов
+            link = entry.link
+            if link in published_links:
+                last_published_time = published_links[link]
+                if datetime.now() - last_published_time < TIME_LIMIT:
+                    continue  # Пропускаем, если ссылка была опубликована менее 12 часов назад
 
-                message = f"<b>{clean_title}</b>\n\n{clean_summary}\n\n<a href='{entry.link}'>Читать далее</a>"
+            clean_title = clean_html(entry.title)
+            clean_summary = clean_html(entry.summary)
+            clean_summary = remove_read_more(clean_summary)
 
-                if 'media_content' in entry:
-                    for media in entry['media_content']:
-                        if 'url' in media:
-                            image_url = media['url']
-                            await bot.send_photo(chat_id=CHANNEL_ID, photo=image_url, caption=message, parse_mode="HTML")
-                            break
-                else:
-                    await bot.send_message(chat_id=CHANNEL_ID, text=message, parse_mode="HTML")
+            message = f"<b>{clean_title}</b>\n\n{clean_summary}\n\n<a href='{link}'>Читать далее</a>"
 
-                save_published_links([entry.link])  # Сохраняем новую ссылку в Redis
-                await asyncio.sleep(30)
+            if 'media_content' in entry:
+                for media in entry['media_content']:
+                    if 'url' in media:
+                        image_url = media['url']
+                        await bot.send_photo(chat_id=CHANNEL_ID, photo=image_url, caption=message, parse_mode="HTML")
+                        break
+            else:
+                await bot.send_message(chat_id=CHANNEL_ID, text=message, parse_mode="HTML")
+
+            # Обновляем временную метку публикации
+            published_links[link] = datetime.now()
+
+            await asyncio.sleep(30)
 
 async def main():
     print("Бот запущен и работает!")
@@ -75,6 +75,7 @@ async def main():
 
 if __name__ == "__main__":
     asyncio.run(main())
+
 
 
 
