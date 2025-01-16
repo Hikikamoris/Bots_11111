@@ -11,7 +11,7 @@ CHANNEL_ID = "@vzglad_today"
 # Список URL RSS-источников
 RSS_FEED_URLS = [
     "https://russian.rt.com/rss",  # Пример 1
-    "http://lenta.ru/l/r/EX/import.rss",  # Пример 2
+    "https://lenta.ru/rss/google-newsstand/main/",  # Пример 2
     "https://www.rbc.ru/rbcfreenews/index.rss",  # Пример 3
     # Добавьте сюда другие источники
 ]
