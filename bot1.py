@@ -1,8 +1,10 @@
 import time
 import feedparser
 import asyncio
+import json
 from telegram import Bot
 import re
+import os
 
 # Ваш токен бота и название канала
 TOKEN = "8099129290:AAGptZmiE0jSbqami7mcO58AZHxoTUX-UZU"
@@ -16,11 +18,26 @@ RSS_FEED_URLS = [
     # Добавьте сюда другие источники
 ]
 
+# Путь к файлу для хранения опубликованных ссылок
+PUBLISHED_LINKS_FILE = "published_links.json"
+
 # Инициализация бота
 bot = Bot(token=TOKEN)
 
-# Список уже опубликованных ссылок (чтобы избежать дублирования)
-published_links = set()
+# Функция для загрузки опубликованных ссылок из файла
+def load_published_links():
+    if os.path.exists(PUBLISHED_LINKS_FILE):
+        with open(PUBLISHED_LINKS_FILE, "r") as file:
+            return set(json.load(file))
+    return set()
+
+# Функция для сохранения опубликованных ссылок в файл
+def save_published_links(links):
+    with open(PUBLISHED_LINKS_FILE, "w") as file:
+        json.dump(list(links), file)
+
+# Загрузка опубликованных ссылок
+published_links = load_published_links()
 
 # Функция для очистки HTML-тегов, кроме поддерживаемых
 def clean_html(text):
@@ -69,7 +86,8 @@ async def fetch_and_post():
 
                 # Добавление ссылки в список опубликованных
                 published_links.add(entry.link)
-                
+                save_published_links(published_links)  # Сохраняем опубликованные ссылки
+
                 # Задержка между публикациями (30 секунд)
                 await asyncio.sleep(30)
 
@@ -83,4 +101,5 @@ async def main():
 
 if __name__ == "__main__":
     asyncio.run(main())
+
 
