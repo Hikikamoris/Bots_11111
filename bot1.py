@@ -1,7 +1,6 @@
 import time
 import feedparser
 import asyncio
-import json
 from telegram import Bot
 import re
 from datetime import datetime, timedelta
@@ -18,7 +17,6 @@ bot = Bot(token=TOKEN)
 
 # Словарь для хранения ссылок с временными метками
 published_links = {}
-
 # Время, после которого посты считаются старыми
 TIME_LIMIT = timedelta(hours=12)
 
@@ -31,6 +29,20 @@ def remove_read_more(text):
     text = re.sub(r'Читать далее.*', '', text)
     return text
 
+async def fetch_past_posts():
+    """Получаем ссылки из последних постов канала для фильтрации уже опубликованных ссылок."""
+    global published_links
+    # Получаем последние 100 сообщений из канала
+    messages = await bot.get_chat_history(CHANNEL_ID, limit=100)
+    
+    for message in messages:
+        # Если в сообщении есть ссылка
+        if message.text:
+            match = re.search(r'https?://[^\s]+', message.text)
+            if match:
+                link = match.group(0)
+                published_links[link] = datetime.now()  # Добавляем в published_links
+
 async def fetch_and_post():
     global published_links
     for rss_feed_url in RSS_FEED_URLS:
@@ -40,8 +52,8 @@ async def fetch_and_post():
             continue
 
         for entry in feed.entries:
-            # Проверяем, была ли уже опубликована ссылка в последние 12 часов
             link = entry.link
+            # Проверяем, была ли уже опубликована ссылка в последние 12 часов
             if link in published_links:
                 last_published_time = published_links[link]
                 if datetime.now() - last_published_time < TIME_LIMIT:
@@ -69,12 +81,17 @@ async def fetch_and_post():
 
 async def main():
     print("Бот запущен и работает!")
+    
+    # Загружаем уже опубликованные посты
+    await fetch_past_posts()
+    
     while True:
         await fetch_and_post()
         await asyncio.sleep(600)
 
 if __name__ == "__main__":
     asyncio.run(main())
+
 
 
 
