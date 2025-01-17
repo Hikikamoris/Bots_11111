@@ -21,18 +21,20 @@ async def fetch_past_posts():
     current_time = time.time()
     cutoff_time = current_time - 12 * 3600  # 12 часов назад
     past_links = set()
-    
+
     try:
-        updates = await bot.get_chat(CHANNEL_ID).get_history(limit=100)
-        for update in updates:
-            if update.date.timestamp() > cutoff_time:  # Проверка по времени
-                if update.entities:
-                    for entity in update.entities:
+        # Получаем историю чата с использованием get_chat_history
+        messages = await bot.get_chat_history(CHANNEL_ID, limit=100)
+        for message in messages:
+            if message.date.timestamp() > cutoff_time:  # Проверка по времени
+                if message.entities:
+                    for entity in message.entities:
                         if entity.type == "url":
-                            link = update.text[entity.offset:entity.offset + entity.length]
+                            link = message.text[entity.offset:entity.offset + entity.length]
                             past_links.add(link)
     except Exception as e:
         print(f"Ошибка получения истории сообщений: {e}")
+
     return past_links
 
 # Получение и отправка новых постов
@@ -76,6 +78,7 @@ async def main():
 
 if __name__ == "__main__":
     asyncio.run(main())
+
 
 
 
