@@ -1,8 +1,8 @@
 import asyncio
 import feedparser
 import re
-from telegram import Bot, ParseMode
-from telegram.ext import Updater, CallbackContext
+from telegram import Bot
+from telegram.constants import ParseMode
 import time
 import httpx
 
@@ -76,6 +76,7 @@ async def main():
 
 if __name__ == "__main__":
     asyncio.run(main())
+
 
 
 
